@@ -26,6 +26,10 @@
 
 #include "mbedtls/esp_debug.h"
 
+#ifdef CONFIG_AWS_IOT_USE_HARDWARE_SECURE_ELEMENT
+#include "mbedtls/atca_mbedtls_wrap.h"
+#endif
+
 #include "esp_log.h"
 #include "esp_vfs.h"
 
@@ -170,6 +174,16 @@ IoT_Error_t iot_tls_connect(Network *pNetwork, TLSConnectParams *params) {
     }
 
     /* Parse client private key... */
+#ifdef CONFIG_AWS_IOT_USE_HARDWARE_SECURE_ELEMENT
+	if (pNetwork->tlsConnectParams.pDevicePrivateKeyLocation[0] == '#') {
+        uint8_t slot_id = pNetwork->tlsConnectParams.pDevicePrivateKeyLocation[1] - '0';
+		ESP_LOGD(TAG, "Using ATECC608A private key from slot %d", slot_id);
+        ret = atca_mbedtls_pk_init(&(tlsDataParams->pkey), slot_id);
+        if (ret != 0) {
+            ESP_LOGE(TAG, " failed !  atca_mbedtls_pk_init returned %02x", ret);
+        }
+	} else 
+#endif
     if (pNetwork->tlsConnectParams.pDevicePrivateKeyLocation[0] == '/') {
         ESP_LOGD(TAG, "Loading client private key from file...");
         ret = mbedtls_pk_parse_keyfile(&(tlsDataParams->pkey),
